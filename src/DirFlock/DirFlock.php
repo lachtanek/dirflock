@@ -4,6 +4,7 @@ class DirFlock
 {
 
 	const MAX_TRIES = 5;
+	const DEAD_TIME = 20;
 
 	/** @var bool */
 	private static $handlerRegistered = false;
@@ -38,10 +39,11 @@ class DirFlock
 		self::tryRegisterHandler();
 
 		$path = self::getLockPath($path);
+		// check if parent dir is writeable, so we can skip then timeout
 		if (!is_writable(dirname($path)))
 			return false;
 
-		if ($type == LOCK_UN)
+		if ($type === LOCK_UN)
 		{
 			if (isset(self::$locks[$path]))
 			{
@@ -53,6 +55,10 @@ class DirFlock
 		}
 		elseif (!($type & LOCK_SH) && !($type & LOCK_EX))
 			return false;
+
+		// remove dead lock if there is one for some reason
+		if (file_exists($path . '/.') && time() - filemtime($path . '/.') > self::DEAD_TIME)
+			rmdir($path);
 
 		for ($tries = 0; $tries <= self::MAX_TRIES; ++$tries)
 		{
